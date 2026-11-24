@@ -156,3 +156,110 @@
 .report-row > .report-delete-button:hover {
   background-color: #ffe0e0;
 }
+
+/* Responsive PDF.js Preview */
+
+.preview-modal {
+  height: 90vh;
+  height: 90dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.preview-modal > button,
+.preview-modal > .modal-header {
+  flex-shrink: 0;
+}
+
+.pdf-viewer {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #dce2e9;
+  border-radius: 8px;
+}
+
+.pdf-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px;
+  background: #f8fafc;
+  border-bottom: 1px solid #dce2e9;
+  flex-shrink: 0;
+}
+
+.pdf-toolbar button {
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+.pdf-toolbar span {
+  font-size: 13px;
+  font-weight: 600;
+  min-width: 45px;
+  text-align: center;
+}
+
+.pdf-scroll {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+  padding: 12px;
+  background: #e5e7eb;
+  -webkit-overflow-scrolling: touch;
+}
+
+.pdf-canvas {
+  display: block;
+  margin: 0 auto;
+  max-width: none;
+  background: white;
+  box-shadow: 0 2px 10px #0002;
+}
+
+.pdf-loading {
+  padding: 30px 12px;
+  text-align: center;
+  color: #64748b;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 600px) {
+
+  .overlay:has(.preview-modal) {
+    padding: 6px;
+  }
+
+  .preview-modal {
+    width: 100%;
+    height: 96vh;
+    height: 96dvh;
+    padding: 10px;
+    gap: 8px;
+  }
+
+  .pdf-toolbar {
+    padding: 8px;
+    gap: 6px;
+  }
+
+  .pdf-toolbar button {
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+
+  .pdf-scroll {
+    padding: 12px;
+    overflow-y: scroll;
+    scrollbar-gutter: stable;
+  }
+
+}

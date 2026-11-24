@@ -8,6 +8,11 @@ import { generatePdf, getWhyTreeLayout, PDF_ZONES, PDF_W, PDF_H } from './pdf';
 
 import './style.css';
 
+import * as pdfjsLib from 'pdfjs-dist';
+import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
+
 
 
 const url = import.meta.env.VITE_SUPABASE_URL, key = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -587,6 +592,169 @@ function LayoutEditor({ report, onChange, onClose }) {
 
   </div>
 
+}
+
+function PdfCanvasPreview({ src }) {
+  const canvasRef = useRef(null);
+
+  const [zoom, setZoom] = useState(100);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    let loadingTask;
+    let renderTask;
+
+    async function renderPdf() {
+      try {
+        setLoading(true);
+        setError('');
+
+        const response = await fetch(src);
+
+        if (!response.ok) {
+          throw new Error('Failed to load PDF');
+        }
+
+        const buffer = await response.arrayBuffer();
+
+        if (cancelled) return;
+
+        loadingTask = pdfjsLib.getDocument({
+          data: new Uint8Array(buffer)
+        });
+
+        const pdf = await loadingTask.promise;
+        const page = await pdf.getPage(1);
+
+        if (cancelled) return;
+
+        const viewport = page.getViewport({
+          scale: 2
+        });
+
+        const canvas = document.createElement('canvas');
+
+        canvas.width = Math.ceil(viewport.width);
+        canvas.height = Math.ceil(viewport.height);
+
+        renderTask = page.render({
+          canvasContext: canvas.getContext('2d'),
+          viewport
+        });
+
+        await renderTask.promise;
+
+        if (cancelled) return;
+
+        const target = canvasRef.current;
+
+        target.width = canvas.width;
+        target.height = canvas.height;
+
+        target.getContext('2d').drawImage(canvas, 0, 0);
+
+        setLoading(false);
+
+      } catch (err) {
+        if (!cancelled) {
+          console.error('PDF Preview Error:', err);
+          setError(err.message);
+          setLoading(false);
+        }
+      }
+    }
+
+    renderPdf();
+
+    return () => {
+      cancelled = true;
+      renderTask?.cancel();
+      loadingTask?.destroy().catch(() => {});
+    };
+
+  }, [src]);
+
+  return (
+    <div className="pdf-viewer">
+
+      <div className="pdf-toolbar">
+
+        <button
+          type="button"
+          className="secondary"
+          disabled={zoom <= 50}
+          onClick={() =>
+            setZoom(z => Math.max(50, z - 25))
+          }
+        >
+          −
+        </button>
+
+        <span>{zoom}%</span>
+
+        <button
+          type="button"
+          className="secondary"
+          disabled={zoom >= 300}
+          onClick={() =>
+            setZoom(z => Math.min(300, z + 25))
+          }
+        >
+          +
+        </button>
+
+        <button
+          type="button"
+          className="secondary"
+          onClick={() => setZoom(100)}
+        >
+          Fit to Width
+        </button>
+
+      </div>
+
+      <div className="pdf-scroll">
+
+        {loading && (
+          <div className="pdf-loading">
+            Loading PDF...
+          </div>
+        )}
+
+        {error && (
+          <div className="pdf-loading">
+            <p>Unable to preview PDF.</p>
+            <small>{error}</small>
+
+            <p>
+              <a
+                href={src}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Open PDF
+              </a>
+            </p>
+          </div>
+        )}
+
+        <canvas
+          ref={canvasRef}
+          className="pdf-canvas"
+          style={{
+            display: loading || error ? 'none' : 'block',
+            width: `${zoom}%`,
+            height: 'auto',
+            maxWidth: 'none'
+          }}
+        />
+
+      </div>
+
+    </div>
+  );
 }
 
 function App() {
@@ -1403,7 +1571,7 @@ async function downloadReport(selectedReport) {
 
         </div>
 
-        <iframe title="IPI PDF Preview" src={preview} />
+        <PdfCanvasPreview src={preview} />
 
         <button onClick={() => pdf(true)}>Download Latest PDF</button>
 
