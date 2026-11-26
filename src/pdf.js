@@ -39,10 +39,18 @@ export function getWhyTreeLayout(root) {
   }
   assign(tree);
   const area = { x: 49, top: 268, w: 496, h: 195 };
-  const rowGap = maxDepth ? Math.min(58, (area.h - 28) / maxDepth) : 0;
-  const slot = area.w / Math.max(1, leaves);
-  const bw = Math.max(3, Math.min(94, slot - 5));
-  const bh = Math.max(4, Math.min(26, maxDepth ? rowGap * .42 : 26));
+ const rowGap = maxDepth
+  ? Math.min(58, (area.h - 36) / maxDepth)
+  : 0;
+
+const slot = area.w / Math.max(1, leaves);
+
+const bw = Math.max(3, Math.min(140, slot - 8));
+
+const bh = Math.max(
+  4,
+  Math.min(36, maxDepth ? rowGap * 0.80 : 36)
+);
   const cx = n => area.x + (n.x + .5) * slot;
   const cy = n => area.top + bh / 2 + n.depth * rowGap;
   const nodes = [], lines = [];
@@ -90,13 +98,13 @@ export async function generatePdf(data = {}) {
 
   const stroke = (x1, t1, x2, t2, width = 0.65) => page.drawLine({ start: { x: x1, y: Y(t1) }, end: { x: x2, y: Y(t2) }, thickness: width, color: lineColor });
 
-  const txt = (s, x, top, size = 9, font = regular, color = ink) => { const value = dataString(s); if (!value.trim()) return; page.drawText(value, { x, y: Y(top + size), size, font, color }); };
+  const txt = (s, x, top, size = 11, font = regular, color = ink) => { const value = dataString(s); if (!value.trim()) return; page.drawText(value, { x, y: Y(top + size), size, font, color }); };
 
   const measure = (s, font, size) => font.widthOfTextAtSize(dataString(s), size);
 
   function wrap(s, font, size, width) { const out = []; for (const para of String(s ?? '').split('\n')) { if (!para.trim()) { out.push(''); continue; } let row = ''; for (const word of dataString(para).split(/\s+/).filter(Boolean)) { let trial = row ? row + ' ' + word : word; if (measure(trial, font, size) <= width) { row = trial; continue; } if (row) { out.push(row); row = ''; } if (measure(word, font, size) <= width) { row = word; continue; } let chunk = ''; for (const c of word) { if (chunk && measure(chunk + c, font, size) > width) { out.push(chunk); chunk = ''; } chunk += c; } row = chunk; } out.push(row); } return out; }
 
-  function fitText(value, x, top, w, h, preferred = 9, min = 5.5, options = {}) {
+  function fitText(value, x, top, w, h, preferred = 11, min = 5.5, options = {}) {
 
     if (!String(value ?? '').trim()) return;
 
@@ -118,7 +126,64 @@ export async function generatePdf(data = {}) {
 
   }
 
-  function section(s, y) { txt(s, 27, y, 9.6, bold); }
+  function drawTreeText(n, preferredSize = 10) {
+  const padding = 3;
+  const availableWidth = n.w - padding * 2;
+  const availableHeight = n.h - padding * 2;
+
+  let size = preferredSize;
+  let lines = [];
+
+  while (size >= 1) {
+    lines = wrap(
+      n.label,
+      regular,
+      size,
+      availableWidth
+    );
+
+    const lineHeight = size * 1.15;
+    const totalHeight = lines.length * lineHeight;
+
+    const fitsWidth = lines.every(
+      line => measure(line, regular, size) <= availableWidth
+    );
+
+    if (totalHeight <= availableHeight && fitsWidth) {
+      break;
+    }
+
+    size -= 0.25;
+  }
+
+  if (size < 1) {
+    throw new Error(
+      'Why-Why diagram is too dense. Please simplify the tree.'
+    );
+  }
+
+  const lineHeight = size * 1.15;
+  const totalHeight = lines.length * lineHeight;
+
+  const startTop =
+    n.top + (n.h - totalHeight) / 2;
+
+  lines.forEach((line, index) => {
+    const textWidth = measure(line, regular, size);
+
+    const x = n.x + (n.w - textWidth) / 2;
+
+    txt(
+      line,
+      x,
+      startTop + index * lineHeight,
+      size,
+      regular
+    );
+  });
+}
+
+  function section(s, y) { txt(s, 27, y, 11, bold); }
 
   async function loadImage(src) { if (!src) return null; try { const response = await fetch(src); if (!response.ok) return null; const bytes = new Uint8Array(await response.arrayBuffer()); if (/^data:image\/jpe?g/i.test(src)) return await doc.embedJpg(bytes); if (/^data:image\/png/i.test(src)) return await doc.embedPng(bytes); if (typeof document === 'undefined') return null; const bitmap = await createImageBitmap(new Blob([bytes])); const canvas = document.createElement('canvas'); canvas.width = Math.min(bitmap.width, 900); canvas.height = Math.round(bitmap.height * canvas.width / bitmap.width); canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height); bitmap.close(); const png = canvas.toDataURL('image/png'); const b = new Uint8Array(await (await fetch(png)).arrayBuffer()); return await doc.embedPng(b); } catch (e) { console.warn('Could not embed image', e); return null; } }
 
@@ -134,9 +199,9 @@ export async function generatePdf(data = {}) {
 
   txt('PT TMMIN', 47, 23, 15, bold, red);
 
-  txt('EPSD SUNTER II', 44, 48, 9.5, bold);
+txt('EPSD SUNTER II', 44, 48, 9.5, bold);
 
-  txt('Maintenance Department', 32, 63, 9, bold);
+txt('Maintenance Department', 32, 63, 9, bold);
 
   fitText('INITIAL PROBLEM INFORMATION', 166, 21, 285, 23, 15, 11, { center: true, bold: true });
 
@@ -184,29 +249,34 @@ export async function generatePdf(data = {}) {
 
   // I. GENERAL INFORMATION
 
-  section('I.', 94);
+ section('I.', 94);
+txt('GENERAL INFORMATION', 38, 94, 11, bold);
 
-  txt('GENERAL INFORMATION', 38, 94, 10, bold);
+const infoLeft = [
+  ['Hari / tanggal', f.date],
+  ['Machine name', f.machine],
+  ['Line', f.line]
+];
 
-  const infoLeft = [['Hari / tanggal', f.date], ['Machine name', f.machine], ['Line', f.line]];
+const infoRight = [
+  ['PIC', f.pic],
+  ['Shift', f.shift],
+  ['Initial Problem', f.problem]
+];
 
-  const infoRight = [['PIC', f.pic], ['Shift', f.shift], ['Initial Problem', f.problem]];
+for (let i = 0; i < 3; i++) {
+  const t = 111 + i * 17;
 
-  for (let i = 0; i < 3; i++) {
+  txt(infoLeft[i][0], 38, t, 10);
+  txt(':', 119, t, 10);
 
-    const t = 111 + i * 16;
+  fitText(infoLeft[i][1], 132, t, 194, 16, 10, 8);
 
-    txt(infoLeft[i][0], 38, t, 8.5); txt(':', 119, t, 8.5);
+  txt(infoRight[i][0], 335, t, 10);
+  txt(':', 415, t, 10);
 
-    fitText(infoLeft[i][1], 136, t, 194, 15, 8.6, 7);
-
-    txt(infoRight[i][0], 345, t, 8.5); txt(':', 432, t, 8.5);
-
-    fitText(infoRight[i][1], 447, t, 120, 15, 8.6, 6.5);
-
-  }
-
-
+  fitText(infoRight[i][1], 428, t, 139, 16, 10, 8);
+}
 
   // II. ANALYSIS: one full-width Why-Why diagram, except the TIME box.
 
@@ -216,9 +286,15 @@ export async function generatePdf(data = {}) {
 
   rect(ax, ay, aw, ah);
 
-  txt('Problem Assumption / Why-Why Analysis', 50, 198, 9, bold);
+ txt('Problem Assumption / Why-Why Analysis', 50, 198, 11, bold);
 
-  stroke(50, 211, 232, 211, 0.7);
+stroke(
+  50,
+  213,
+  50 + measure('Problem Assumption / Why-Why Analysis', bold, 11),
+  213,
+  0.7
+);
 
 
 
@@ -270,26 +346,35 @@ export async function generatePdf(data = {}) {
 
   stroke(tx, ty + 21, tx + tw, ty + 21);
 
-  fitText('Estimation time', tx + 2, ty + 4, tw / 2 - 4, 14, 7.2, 6, { center: true });
+  fitText('Estimation time', tx + 2, ty + 4, tw / 2 - 4, 16, 9, 8, { center: true });
 
-  fitText('Actual Time', tx + tw / 2 + 2, ty + 4, tw / 2 - 4, 14, 7.2, 6, { center: true });
+fitText('Actual Time', tx + tw / 2 + 2, ty + 4, tw / 2 - 4, 16, 9, 8, { center: true });
 
-  fitText(f.estimation, tx + 3, ty + 27, tw / 2 - 6, 19, 9, 6, { center: true });
+fitText(f.estimation, tx + 3, ty + 27, tw / 2 - 6, 19, 11, 8, { center: true });
 
-  fitText(f.actual, tx + tw / 2 + 3, ty + 27, tw / 2 - 6, 19, 9, 6, { center: true });
+fitText(f.actual, tx + tw / 2 + 3, ty + 27, tw / 2 - 6, 19, 11, 8, { center: true });
 
 
 
   // Bounded TOP-DOWN tree. Every box and connector stays inside the left cell.
 
-  const treeLayout = getWhyTreeLayout(data.tree || { label: '', children: [] });
-  if (treeLayout) {
-    for (const [x1, y1, x2, y2] of treeLayout.lines) stroke(x1, y1, x2, y2, .6);
-    for (const n of treeLayout.nodes) {
-      rect(n.x, n.top, n.w, n.h, { stroke: .6 });
-      fitText(n.label, n.x + 2, n.top + 1, n.w - 4, n.h - 2, Math.min(7.3, n.w / 9), 4.2, { center: true });
-    }
+const treeLayout = getWhyTreeLayout(
+  data.tree || { label: '', children: [] }
+);
+
+if (treeLayout) {
+  for (const [x1, y1, x2, y2] of treeLayout.lines) {
+    stroke(x1, y1, x2, y2, 0.6);
   }
+
+  for (const n of treeLayout.nodes) {
+    rect(n.x, n.top, n.w, n.h, {
+      stroke: 0.6
+    });
+
+    drawTreeText(n, 10);
+  }
+}
 
   await drawImages('assumption');
 
@@ -303,13 +388,13 @@ export async function generatePdf(data = {}) {
 
   rect(rx, ry, rw, rh); stroke(rx + half, ry, rx + half, ry + rh); stroke(rx, ry + 29, rx + rw, ry + 29);
 
-  fitText('Temporary Action', rx, ry + 7, half, 16, 9, 8, { center: true, bold: true });
+fitText('Temporary Action', rx, ry + 7, half, 18, 11, 9, { center: true, bold: true });
 
-  fitText('Fixed Action', rx + half, ry + 7, half, 16, 9, 8, { center: true, bold: true });
+fitText('Fixed Action', rx + half, ry + 7, half, 18, 11, 9, { center: true, bold: true });
 
-  fitText(f.temporary, rx + 9, ry + 37, half - 18, 86, 9, 6.2);
+fitText(f.temporary, rx + 9, ry + 37, half - 18, 86, 11, 8);
 
-  fitText(f.fixed, rx + half + 9, ry + 37, half - 18, 86, 9, 6.2);
+fitText(f.fixed, rx + half + 9, ry + 37, half - 18, 86, 11, 8);
 
   await drawImages('temporary'); await drawImages('fixed');
 
@@ -321,7 +406,7 @@ export async function generatePdf(data = {}) {
 
   rect(38, 738, 519, 90);
 
-  fitText(f.next, 48, 746, 498, 45, 9, 6.4);
+  fitText(f.next, 48, 746, 498, 45, 11, 8);
 
   await drawImages('next');
 
